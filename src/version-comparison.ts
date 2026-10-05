@@ -1,12 +1,7 @@
 /**
  * @system publish-registry
  * @status handwritten
- * @edit edit directly
- *
- * `isTagAheadOfRegistry` — pure semver comparison. No network, no I/O. Lives
- * here (not in the network file) because it is the ONLY non-fetch operation
- * in the primitive; mixing it with the fetch group would couple unrelated
- * concerns under one canonical unit.
+ * @edit pure semver comparison (no network, no I/O) — the ONLY non-fetch operation in the primitive, kept out of the fetch group so unrelated concerns are not coupled under one canonical unit
  */
 import { semver } from "bun";
 

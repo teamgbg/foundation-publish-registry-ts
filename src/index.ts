@@ -1,22 +1,7 @@
 /**
  * @system publish-registry
  * @status handwritten
- * @edit edit directly
- * Shared publish-registry reading: packument, dist-tag, github-packages.
- * Hosts are caller-supplied; this primitive never embeds a registry host
- * literal so a registry rename is one config edit, not a code edit.
- */
-/**
- * Is this EXACT version published?
- *
- * Distinct from "is it the latest", and that distinction is the point. A caller
- * asking whether a publish happened wants existence; comparing against
- * `dist-tags.latest` answers a different question and is wrong for every version
- * except the most recent one. publish-chain's strand classifier was doing
- * exactly that (`tagObservable = version === latest`), so any historical tag —
- * the normal case for a package published more than once — was classified NOT
- * observable and fell through to superseded/strand on a fact never checked,
- * which mis-blocks a legitimate historical tag.
+ * @edit hosts are caller-supplied; this primitive never embeds a registry host literal, so a registry rename is one config edit, not a code edit
  */
 
 import { semver } from "bun";
@@ -24,15 +9,7 @@ import { isTagAheadOfRegistry } from "./version-comparison.ts";
 import { getAppLogger } from "@teamscala/logger/app-loggers";
 export { isTagAheadOfRegistry };
 
-/**
- * What the registry knows about one package.
- *
- * `latest` and `versions` come from the SAME packument fetch because they always
- * did — the response carries both and only `latest` was being read. Returning
- * both costs nothing and closes a real gap: "is this version published?" and "is
- * this version the latest?" are different questions, and answering the first
- * with the second is wrong for every package published more than once.
- */
+/** What the registry knows about one package: `latest` and `versions` come from the SAME packument fetch because the response carries both, and "is this version published?" is a different question from "is this the latest?" — answering the first with the second is wrong for every package published more than once. */
 export interface PackumentSummary {
 	/** `dist-tags.latest`, or null when the package is new/unreachable. */
 	latest: string | null;
@@ -40,15 +17,7 @@ export interface PackumentSummary {
 	versions: string[];
 }
 
-/**
- * Fetch what the registry holds for a package (null latest + empty versions =
- * new or unreachable).
- *
- * A failed fetch is indistinguishable from a new package by design here — both
- * yield "nothing known" — because every caller must treat an unknown registry
- * state conservatively (assume the version is NOT published and do the work)
- * rather than assume it is.
- */
+/** Fetch what the registry holds for a package (null latest + empty versions = new or unreachable). A failed fetch is indistinguishable from a new package BY DESIGN — both yield "nothing known" — because every caller must treat an unknown registry state conservatively (assume NOT published, do the work) rather than assume it is. */
 export async function getPackumentSummary(
 	name: string,
 	token: string | undefined,
@@ -77,8 +46,7 @@ export async function getPackumentSummary(
 			versions: Object.keys(pkg.versions ?? {}),
 		};
 	} catch (error) {
-		// Registry unreachable reads as "no versions known" downstream; the
-		// reason is on stderr, not swallowed.
+		// Registry unreachable reads as "no versions known" downstream; the reason is logged, not swallowed.
 		getAppLogger().error(`[publish-registry] dist-tags read failed: ${String(error)}`);
 		registryFailed = true;
 	}
@@ -86,15 +54,12 @@ export async function getPackumentSummary(
 	return { latest: null, versions: [] };
 }
 
+/** Is this EXACT version published? Existence, not "is it the latest": publish-chain's strand classifier compared against `dist-tags.latest` (`tagObservable = version === latest`), so every historical tag was classified NOT observable and mis-blocked as superseded/strand on a fact never checked. */
 export function isVersionPublished(summary: PackumentSummary, version: string): boolean {
 	return summary.versions.includes(version);
 }
 
-/**
- * Fetch the registry's latest published version for a package (null =
- * new/unreachable). Thin wrapper over `getPackumentSummary` so there is ONE
- * fetch shape and the two cannot drift.
- */
+/** Fetch the registry's latest published version for a package (null = new/unreachable) — a thin wrapper over `getPackumentSummary` so there is ONE fetch shape and the two cannot drift. */
 export async function getPublishedVersion(
 	name: string,
 	token: string | undefined,
@@ -103,15 +68,7 @@ export async function getPublishedVersion(
 	return (await getPackumentSummary(name, token, registry)).latest;
 }
 
-/**
- * Fetch the registry's dist-tag version for a package
- * (`${registry}/${name}/${distTag}`). Same contract as `getPublishedVersion` —
- * null = new or unreachable, conservative-by-design (every caller assumes
- * NOT-installed and does the work).
- *
- * Extracted from bun-stable-watch and singleton-tools-currency-watch where
- * previously hand-rolled, no typed surface.
- */
+/** Fetch the registry's dist-tag version for a package (`${registry}/${name}/${distTag}`) — same contract as `getPublishedVersion`: null = new or unreachable, conservative-by-design (every caller assumes NOT-installed and does the work). Extracted from bun-stable-watch and singleton-tools-currency-watch where it was previously hand-rolled with no typed surface. */
 export async function getDistTagVersion(
 	name: string,
 	distTag: string,
@@ -140,16 +97,7 @@ export async function getDistTagVersion(
 	}
 }
 
-/**
- * Fetch the latest version of a GitHub-Packages-published package
- * (`${registry}/${name}` with GitHub-Packages token auth). Same capability as
- * `getPackumentSummary`, not a different one — the github-packages endpoint
- * speaks the npm packument protocol.
- *
- * Extracted from scala-tools-currency-watchdog which was hardcoding a URL
- * with an embedded package name and a GitHub-Packages auth header shape
- * that did not match any other call site.
- */
+/** The latest version of a GitHub-Packages-published package (`${registry}/${name}` with GitHub-Packages token auth) — the same capability as `getPackumentSummary`, not a different one, because the github-packages endpoint speaks the npm packument protocol. Extracted from scala-tools-currency-watchdog, which hardcoded a URL with an embedded package name and an auth header shape no other call site matched. */
 export async function getGithubPackagesLatestVersion(
 	name: string,
 	token: string | undefined,
